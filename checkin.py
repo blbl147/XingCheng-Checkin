@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 微信小程序自动签到脚本 - GitHub Actions版
-所有敏感信息从环境变量读取，代码中无任何硬编码
+活动代码和店铺代码硬编码，仅Token和AppID从环境变量读取
 """
 
 import os
@@ -36,12 +36,14 @@ class Logger:
 
 
 class MiniProgramCheckin:
-    def __init__(self, token, app_id, activity_code, shop_code):
+    # 🔥 硬编码配置区域 - 根据你的小程序修改这里
+    ACTIVITY_CODE = "P151750060991850814"  # 活动代码 响应中的"code"
+    SHOP_CODE = "SC1008011"                # 店铺代码 响应中的"shopCode"
+
+    def __init__(self, token, app_id):
         self.base_url = "https://api.lzstack.com"
         self.token = token
         self.app_id = app_id
-        self.activity_code = activity_code
-        self.shop_code = shop_code
 
         self.headers = {
             'Host': 'api.lzstack.com',
@@ -56,7 +58,7 @@ class MiniProgramCheckin:
             'Sec-Fetch-Site': 'cross-site',
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Dest': 'empty',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090b19)XWEB/14315',
             'Referer': f'https://servicewechat.com/{self.app_id}/5/page-frame.html',
             'Accept-Language': 'zh-CN,zh;q=0.9',
             'Accept-Encoding': 'gzip, deflate'
@@ -66,17 +68,22 @@ class MiniProgramCheckin:
         """执行签到"""
         url = f"{self.base_url}/mall/v2/api/checkin/handler"
 
+        # 🔥 使用类变量确保参数不为空
         payload = {
-            "code": self.activity_code,
-            "shopCode": self.shop_code,
+            "code": self.ACTIVITY_CODE,
+            "shopCode": self.SHOP_CODE,
             "startTime": datetime.now().strftime("%Y-%m-%d 00:00:00"),
             "endTime": datetime.now().strftime("%Y-%m-%d 23:59:59")
         }
 
         try:
             Logger.info("=" * 60)
-            Logger.info(f"开始执行签到... 当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            Logger.info(f"使用App ID: {self.app_id}")
+            Logger.info(f"开始执行签到...")
+            Logger.info(f"当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            Logger.info(f"App ID: {self.app_id}")
+            Logger.info(f"活动代码: {self.ACTIVITY_CODE}")
+            Logger.info(f"店铺代码: {self.SHOP_CODE}")
+            Logger.info(f"请求体: {json.dumps(payload, ensure_ascii=False)}")
 
             response = requests.post(
                 url,
@@ -104,6 +111,8 @@ class MiniProgramCheckin:
 
                 if coupons:
                     Logger.success(f"获得优惠券: {len(coupons)}张")
+                    for coupon in coupons:
+                        Logger.info(f"  - {coupon.get('name', '未知优惠券')}")
 
                 return True, f"签到成功！积分+{integral}"
 
@@ -115,8 +124,15 @@ class MiniProgramCheckin:
                 Logger.error(f"签到失败: {message} (code: {code})")
                 return False, f"签到失败: {message}"
 
+        except requests.exceptions.RequestException as e:
+            Logger.error(f"网络请求异常: {str(e)}")
+            return False, f"网络异常: {str(e)}"
+        except json.JSONDecodeError as e:
+            Logger.error(f"响应解析失败: {str(e)}")
+            Logger.error(f"原始响应: {response.text}")
+            return False, f"响应解析失败"
         except Exception as e:
-            Logger.error(f"异常: {str(e)}")
+            Logger.error(f"未知异常: {str(e)}")
             import traceback
             Logger.error(traceback.format_exc())
             return False, f"异常: {str(e)}"
@@ -170,20 +186,18 @@ class Notifier:
 
 
 def main():
-    """主函数 - 从环境变量读取所有配置"""
+    """主函数"""
 
     print("""
     ╔═══════════════════════════════════════╗
     ║   微信小程序自动签到 - GitHub版       ║
-    ║   所有配置从环境变量读取               ║
+    ║   活动/店铺代码已硬编码               ║
     ╚═══════════════════════════════════════╝
     """)
 
     # ========== 从环境变量读取配置 ==========
     TOKEN = os.getenv('CHECKIN_TOKEN')
     APP_ID = os.getenv('APP_ID')
-    ACTIVITY_CODE ='P151750060991850814'   # 活动代码 响应中的"code"
-    SHOP_CODE ='SC1008011' # 店铺代码  响应中的"shopCode"
 
     # 通知配置（可选）
     SCKEY = os.getenv('SCKEY')
@@ -205,42 +219,36 @@ def main():
         for param in missing_params:
             Logger.error(f"  - {param}")
         Logger.error("=" * 60)
-        Logger.info("📖 配置教程：")
-        Logger.info("  1. 进入仓库 Settings")
-        Logger.info("  2. 左侧菜单选择 Secrets and variables → Actions")
-        Logger.info("  3. 点击 New repository secret")
-        Logger.info("  4. 添加上述缺失的变量")
-        Logger.error("=" * 60)
         sys.exit(1)
 
-    Logger.info(f"✅ 读取到Token: {TOKEN[:20]}***{TOKEN[-10:]}")
+    Logger.info(f"✅ Token: {TOKEN[:20]}***{TOKEN[-10:]}")
     Logger.info(f"✅ App ID: {APP_ID}")
-    Logger.info(f"✅ 活动代码: {ACTIVITY_CODE}")
-    Logger.info(f"✅ 店铺代码: {SHOP_CODE}")
 
     # ========== 执行签到 ==========
-    checkin = MiniProgramCheckin(TOKEN, APP_ID, ACTIVITY_CODE, SHOP_CODE)
+    checkin = MiniProgramCheckin(TOKEN, APP_ID)
     success, message = checkin.check_in()
 
     # ========== 发送通知 ==========
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     if success:
         title = "✅ 签到成功"
         content = f"""
-        ### 签到成功 🎉
+### 签到成功 🎉
 
-        **时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        **结果**: {message}
-        **店铺**: {SHOP_CODE}
-        **活动**: {ACTIVITY_CODE}
+**时间**: {current_time}
+**结果**: {message}
+**店铺**: {MiniProgramCheckin.SHOP_CODE}
+**活动**: {MiniProgramCheckin.ACTIVITY_CODE}
         """
     else:
         title = "❌ 签到失败"
         content = f"""
-        ### 签到失败 ⚠️
+### 签到失败 ⚠️
 
-        **时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        **错误**: {message}
-        **建议**: 请检查Token是否过期
+**时间**: {current_time}
+**错误**: {message}
+**建议**: 请检查Token是否过期或活动代码是否正确
         """
 
     # 发送通知
