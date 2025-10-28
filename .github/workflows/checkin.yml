@@ -1,18 +1,16 @@
 name: 自动签到
 
 on:
-  # 定时触发（UTC时间，需要-8小时转换为北京时间）
   schedule:
-    # 每天 00:00 UTC = 08:00 北京时间
+    # 每天北京时间 08:00 执行（UTC 00:00）
     - cron: '0 0 * * *'
 
-  # 手动触发
   workflow_dispatch:
     inputs:
       reason:
         description: '手动触发原因'
         required: false
-        default: '测试运行'
+        默认: '测试运行'
 
 permissions:
   contents: read
