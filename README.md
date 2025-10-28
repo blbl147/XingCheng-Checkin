@@ -7,4 +7,6 @@
 
 token在请求标头里，添加到GitHub Secrets里，命名为 CHECKIN_TOKEN
 
+
 app-id在请求标头里，命名为APP_ID
+

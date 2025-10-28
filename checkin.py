@@ -224,7 +224,7 @@ def main():
         **活动**: {ACTIVITY_CODE}
         """
     else:
-        title = "❌ 签到失败"
+        title = "❌ 签到失败 "
         content = f"""
         ### 签到失败 ⚠️
 
