@@ -1,0 +1,107 @@
+name: 自动签到
+
+on:
+  # 定时触发（UTC时间，北京时间-8小时）
+  schedule:
+    # 每天 00:00 UTC = 08:00 北京时间
+    - cron: '0 0 * * *'
+    # 每天 23:30 UTC = 07:30 北京时间（备用）
+    - cron: '30 23 * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '手动触发原因'
+        required: false
+        default: '测试运行'
+
+# 权限设置
+permissions:
+  contents: read
+
+jobs:
+  checkin:
+    name: 执行签到
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. 检出代码
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+      
+      # 2. 设置Python环境
+      - name: 🐍 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      # 3. 安装依赖
+      - name: 📦 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      # 4. 执行签到（从Secrets读取环境变量）
+      - name: 🚀 执行签到脚本
+        env:
+          CHECKIN_TOKEN: ${{ secrets.CHECKIN_TOKEN }}
+          ACTIVITY_CODE: ${{ secrets.ACTIVITY_CODE }}
+          SHOP_CODE: ${{ secrets.SHOP_CODE }}
+          SCKEY: ${{ secrets.SCKEY }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          BARK_URL: ${{ secrets.BARK_URL }}
+        run: |
+          python checkin.py
+      
+      # 5. 上传日志（失败时）
+      - name: 📋 上传执行日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkin-log-${{ github.run_number }}
+          path: |
+            *.log
+          retention-days: 7
+      
+      # 6. 通知构建结果
+      - name: 📬 通知构建状态
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ 签到任务执行成功"
+          else
+            echo "❌ 签到任务执行失败"
+          fi
+
+  # 可选：多账号支持
+  checkin-multi:
+    name: 多账号签到
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'  # 仅手动触发时执行
+    strategy:
+      matrix:
+        account: [1, 2, 3]  # 支持最多3个账号
+      fail-fast: false  # 一个失败不影响其他账号
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      
+      - name: 执行签到 - 账号${{ matrix.account }}
+        env:
+          CHECKIN_TOKEN: ${{ secrets[format('CHECKIN_TOKEN_{0}', matrix.account)] }}
+          ACTIVITY_CODE: ${{ secrets.ACTIVITY_CODE }}
+          SHOP_CODE: ${{ secrets.SHOP_CODE }}
+          SCKEY: ${{ secrets[format('SCKEY_{0}', matrix.account)] }}
+        run: |
+          echo "🔐 执行账号 ${{ matrix.account }} 的签到"
+          python checkin.py
