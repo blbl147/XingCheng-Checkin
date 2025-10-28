@@ -43,7 +43,7 @@ class MiniProgramCheckin:
             'Connection': 'keep-alive',
             'app-version': '2.18.88',
             'x-http-token': self.token,
-            'app-id': 'wxaa9a9e72172f63b4',
+            'app-id': self.app_id,
             'client-name': 'mini-program',
             'xweb_xhr': '1',
             'Content-Type': 'application/json',
@@ -191,6 +191,7 @@ def main():
     TOKEN = os.getenv('CHECKIN_TOKEN')
     ACTIVITY_CODE = os.getenv('ACTIVITY_CODE', 'P151750060991850814')
     SHOP_CODE = os.getenv('SHOP_CODE', 'SC1008011')
+    app_id = os.getenv('APP_ID')  # 默认小程序ID
 
     # 通知配置（可选）
     SCKEY = os.getenv('SCKEY')  # Server酱
