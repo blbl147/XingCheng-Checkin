@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+微信小程序自动签到脚本 - GitHub Actions版
+所有敏感信息从环境变量读取，代码中无任何硬编码
+"""
 
 import os
 import sys
 import requests
 import json
-import time
 from datetime import datetime
 import urllib3
 
@@ -33,11 +36,13 @@ class Logger:
 
 
 class MiniProgramCheckin:
-    def __init__(self, token, activity_code, shop_code):
+    def __init__(self, token, app_id, activity_code, shop_code):
         self.base_url = "https://api.lzstack.com"
         self.token = token
+        self.app_id = app_id
         self.activity_code = activity_code
         self.shop_code = shop_code
+
         self.headers = {
             'Host': 'api.lzstack.com',
             'Connection': 'keep-alive',
@@ -52,7 +57,7 @@ class MiniProgramCheckin:
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Dest': 'empty',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://servicewechat.com/wxaa9a9e72172f63b4/5/page-frame.html',
+            'Referer': f'https://servicewechat.com/{self.app_id}/5/page-frame.html',
             'Accept-Language': 'zh-CN,zh;q=0.9',
             'Accept-Encoding': 'gzip, deflate'
         }
@@ -71,6 +76,7 @@ class MiniProgramCheckin:
         try:
             Logger.info("=" * 60)
             Logger.info(f"开始执行签到... 当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            Logger.info(f"使用App ID: {self.app_id}")
 
             response = requests.post(
                 url,
@@ -162,54 +168,58 @@ class Notifier:
         except Exception as e:
             Logger.warning(f"PushPlus推送失败: {str(e)}")
 
-    @staticmethod
-    def send_bark(url, title, content):
-        """Bark推送（iOS）"""
-        if not url:
-            return
-        try:
-            bark_url = f"{url}/{title}/{content}"
-            response = requests.get(bark_url, timeout=10)
-            if response.status_code == 200:
-                Logger.success("Bark通知发送成功")
-            else:
-                Logger.warning(f"Bark通知发送失败: {response.text}")
-        except Exception as e:
-            Logger.warning(f"Bark推送失败: {str(e)}")
-
 
 def main():
     """主函数 - 从环境变量读取所有配置"""
 
     print("""
     ╔═══════════════════════════════════════╗
-    ║   微信小程序自动签到 - GitHub版        ║
+    ║   微信小程序自动签到 - GitHub版       ║
+    ║   所有配置从环境变量读取               ║
     ╚═══════════════════════════════════════╝
     """)
 
     # ========== 从环境变量读取配置 ==========
     TOKEN = os.getenv('CHECKIN_TOKEN')
+    APP_ID = os.getenv('APP_ID')
     ACTIVITY_CODE = os.getenv('ACTIVITY_CODE', 'P151750060991850814')
     SHOP_CODE = os.getenv('SHOP_CODE', 'SC1008011')
-    app_id = os.getenv('APP_ID')  # 默认小程序ID
 
     # 通知配置（可选）
-    SCKEY = os.getenv('SCKEY')  # Server酱
-    PUSHPLUS_TOKEN = os.getenv('PUSHPLUS_TOKEN')  # PushPlus
-    BARK_URL = os.getenv('BARK_URL')  # Bark
+    SCKEY = os.getenv('SCKEY')
+    PUSHPLUS_TOKEN = os.getenv('PUSHPLUS_TOKEN')
 
     # ========== 验证必需参数 ==========
+    missing_params = []
+
     if not TOKEN:
-        Logger.error("❌ 未配置 CHECKIN_TOKEN 环境变量！")
-        Logger.error("请在 GitHub Secrets 中添加 CHECKIN_TOKEN")
+        missing_params.append('CHECKIN_TOKEN')
+
+    if not APP_ID:
+        missing_params.append('APP_ID')
+
+    if missing_params:
+        Logger.error(f"❌ 缺少必需的环境变量：{', '.join(missing_params)}")
+        Logger.error("=" * 60)
+        Logger.error("请在 GitHub Secrets 中添加以下变量：")
+        for param in missing_params:
+            Logger.error(f"  - {param}")
+        Logger.error("=" * 60)
+        Logger.info("📖 配置教程：")
+        Logger.info("  1. 进入仓库 Settings")
+        Logger.info("  2. 左侧菜单选择 Secrets and variables → Actions")
+        Logger.info("  3. 点击 New repository secret")
+        Logger.info("  4. 添加上述缺失的变量")
+        Logger.error("=" * 60)
         sys.exit(1)
 
-    Logger.info(f"✅ 读取到Token: {TOKEN[:20]}...{TOKEN[-10:]}")
+    Logger.info(f"✅ 读取到Token: {TOKEN[:20]}***{TOKEN[-10:]}")
+    Logger.info(f"✅ App ID: {APP_ID}")
     Logger.info(f"✅ 活动代码: {ACTIVITY_CODE}")
     Logger.info(f"✅ 店铺代码: {SHOP_CODE}")
 
     # ========== 执行签到 ==========
-    checkin = MiniProgramCheckin(TOKEN, ACTIVITY_CODE, SHOP_CODE)
+    checkin = MiniProgramCheckin(TOKEN, APP_ID, ACTIVITY_CODE, SHOP_CODE)
     success, message = checkin.check_in()
 
     # ========== 发送通知 ==========
@@ -224,7 +234,7 @@ def main():
         **活动**: {ACTIVITY_CODE}
         """
     else:
-        title = "❌ 签到失败 "
+        title = "❌ 签到失败"
         content = f"""
         ### 签到失败 ⚠️
 
@@ -233,14 +243,13 @@ def main():
         **建议**: 请检查Token是否过期
         """
 
-    # 发送各类通知
+    # 发送通知
     Notifier.send_server_chan(SCKEY, title, content)
     Notifier.send_pushplus(PUSHPLUS_TOKEN, title, content)
-    Notifier.send_bark(BARK_URL, title, message)
 
     # ========== 设置退出码 ==========
     if not success:
-        sys.exit(1)  # 失败时返回非0退出码，GitHub Actions会标记为失败
+        sys.exit(1)
 
 
 if __name__ == "__main__":
