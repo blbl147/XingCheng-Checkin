@@ -41,8 +41,6 @@ jobs:
         env:
           CHECKIN_TOKEN: ${{ secrets.CHECKIN_TOKEN }}
           APP_ID: ${{ secrets.APP_ID }}
-          ACTIVITY_CODE: ${{ secrets.ACTIVITY_CODE }}
-          SHOP_CODE: ${{ secrets.SHOP_CODE }}
           SCKEY: ${{ secrets.SCKEY }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
         run: |

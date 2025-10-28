@@ -182,8 +182,8 @@ def main():
     # ========== 从环境变量读取配置 ==========
     TOKEN = os.getenv('CHECKIN_TOKEN')
     APP_ID = os.getenv('APP_ID')
-    ACTIVITY_CODE = os.getenv('ACTIVITY_CODE', 'P151750060991850814')
-    SHOP_CODE = os.getenv('SHOP_CODE', 'SC1008011')
+    ACTIVITY_CODE = os.getenv( 'P151750060991850814')   # 活动代码 响应中的"code"
+    SHOP_CODE = os.getenv( 'SC1008011') # 店铺代码  响应中的"shopCode"
 
     # 通知配置（可选）
     SCKEY = os.getenv('SCKEY')
