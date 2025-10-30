@@ -2,8 +2,8 @@ name: 自动签到
 
 on:
   schedule:
-    # 每天北京时间 08:00 执行（UTC 00:00）
-    - cron: '0 0 * * *'
+    # 每天北京时间 01:10 执行（UTC 17:10）
+    - cron: '10 17 * * *'
 
   workflow_dispatch:
     inputs:
