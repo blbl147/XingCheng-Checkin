@@ -42,7 +42,7 @@ jobs:
           SCKEY: ${{ secrets.SCKEY }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
         run: |
-          python checkin.py
+          python XingCheng_checkin.py
 
       - name: 📋 上传执行日志
         if: failure()
