@@ -1,15 +1,17 @@
 name: 龙空论坛自动签到
 
 on:
-  # 定时触发（使用UTC时间，北京时间-8小时）
+  # 定时触发
   schedule:
-    # 北京时间 04:00 = UTC 20:00 (前一天)
-    - cron: '0 20 * * *'
-    # 北京时间 14:00 = UTC 06:00 (当天)
-    - cron: '0 6 * * *'
+    - cron: '0 20 * * *'  # 北京时间 04:00
+    - cron: '0 6 * * *'   # 北京时间 14:00
   
-  # 手动触发（用于测试）
+  # 手动触发
   workflow_dispatch:
+
+# 设置GITHUB_TOKEN权限
+permissions:
+  contents: write  # 允许写入仓库内容
 
 jobs:
   punch:
@@ -20,7 +22,8 @@ jobs:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       
       # 2. 设置Python环境
@@ -36,29 +39,45 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      # 4. 运行签到脚本
+      # 4. 显示当前时间（用于调试）
+      - name: ⏰ 显示当前时间
+        run: |
+          echo "UTC时间: $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "北京时间: $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')"
+      
+      # 5. 运行签到脚本
       - name: 🚀 执行签到
         env:
           LKONG_COOKIE: ${{ secrets.LKONG_COOKIE }}
           LKONG_REQUEST_BODY: ${{ secrets.LKONG_REQUEST_BODY }}
-          TZ: Asia/Shanghai  # 设置时区为北京时间
+          TZ: Asia/Shanghai
         run: |
-          echo "当前北京时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "开始执行签到任务..."
           python lkong_punch.py
       
-      # 5. 提交状态文件（保存签到记录）
+      # 6. 提交状态文件（方案二：使用官方Action）
       - name: 💾 提交签到状态
-        if: always()  # 无论成功失败都执行
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update punch status - $(date '+%Y-%m-%d %H:%M:%S')" && git push)
-        continue-on-error: true  # 即使提交失败也不影响任务状态
+        if: always()
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: '📝 签到记录更新 [${{ github.run_number }}]'
+          commit_user_name: Lkong Bot
+          commit_user_email: bot@lkong.auto
+          file_pattern: '*.txt'
+          skip_dirty_check: false
+          skip_fetch: false
+          skip_checkout: false
+        continue-on-error: true
       
-      # 6. 发送通知（可选，失败时通知）
-      - name: 📧 发送失败通知
-        if: failure()
+      # 7. 显示运行结果
+      - name: 📊 显示运行结果
+        if: always()
         run: |
-          echo "❌ 签到失败，请检查日志"
-          # 这里可以添加其他通知方式，如邮件、Telegram等
+          echo "=========================================="
+          if [ -f status.txt ]; then
+            echo "📄 签到状态:"
+            cat status.txt
+          else
+            echo "⚠️ 未找到状态文件"
+          fi
+          echo "=========================================="
